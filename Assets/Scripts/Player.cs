@@ -12,8 +12,10 @@ public class Player : MonoBehaviour
     float vAxis;
     float originalSpeed; // 원래 속도를 저장할 변수
     int wallCollisionCount = 0; // 벽과의 충돌 수를 추적
+
     bool wDown; // 걸을 때를 표현하기 위한 함수
     bool jDown; // 점프하는 순간을 나타내기 위한 함수
+    bool iDown; // Weapon 장착을 위한 함수
     bool isJump; // 점프하는 중인지를 나타내기 위한 함수
     bool isDodge;
 
@@ -22,6 +24,8 @@ public class Player : MonoBehaviour
 
     Rigidbody rigid; // rigid 효과를 부르기 위한 변수 생성
     Animator anim;
+
+    GameObject nearObject; // 트리거된 아이템을 저장하기 위한 변수
 
     // Start is called before the first frame update
     void Awake()
@@ -51,6 +55,7 @@ public class Player : MonoBehaviour
         vAxis = Input.GetAxisRaw("Vertical"); // Vertical = up/ down
         wDown = Input.GetButton("Walk"); // 방향값이 아니라 shift버튼만 누르는 것이므로 GetButton으로 받아야함 
         jDown = Input.GetButtonDown("Jump"); // 버튼을 누른 그 순간만 읽는 것이므로 GetButtonDown을 쓴다
+        iDown = Input.GetButtonDown("Interation");
     }
 
     void Move()
@@ -138,4 +143,18 @@ public class Player : MonoBehaviour
             }
         }
     }
+
+    void OnTriggerStay(Collider other) // Trigger했을때 = 맞닿다
+    {
+        if(other.tag == "Weapon") // Collider.tag = Collider의 tag, Collider.GameObject.tag = Collider가 가진 GameObject의 tag
+            nearObject = other.gameObject; 
+        
+    }
+
+    void OnTriggerExit(Collider other)
+    {
+        if(other.tag == "Weapon") 
+            nearObject = null; 
+    }
+    
 }
