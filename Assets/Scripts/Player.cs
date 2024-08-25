@@ -8,16 +8,34 @@ public class Player : MonoBehaviour
 {
     public float speed; // 인스펙터 창에서 수정가능 
     public float jumpPower; // 점프높이 조정
+    public GameObject[] weapons; // 무기를 입수하면 해당무기의 모습을 나타내도록 하는 코드를 구현하기 위한 배열
+    public bool[] hasWeapons; // 가지고 있는 무기를 구분하기 위한 배열
+
+    public int ammo;
+    public int coin;
+    public int health;
+    public int hasGrenades;
+
+    public int maxAmmo;
+    public int maxCoin;
+    public int maxHealth;
+    public int maxHasGrenades;
+
     float hAxis;
     float vAxis;
     float originalSpeed; // 원래 속도를 저장할 변수
     int wallCollisionCount = 0; // 벽과의 충돌 수를 추적
 
-    bool wDown; // 걸을 때를 표현하기 위한 함수
-    bool jDown; // 점프하는 순간을 나타내기 위한 함수
-    bool iDown; // Weapon 장착을 위한 함수
-    bool isJump; // 점프하는 중인지를 나타내기 위한 함수
-    bool isDodge;
+    bool wDown; // 걸을 때를 표현하기 위한 변수
+    bool jDown; // 점프하는 순간을 나타내기 위한 변수
+    bool iDown; // Weapon 장착을 위한 변수
+    bool sDown1; // 장비 1
+    bool sDown2; // 장비 2
+    bool sDown3; // 장비 3
+
+    bool isJump; // 점프하는 중인지를 나타내기 위한 변수
+    bool isDodge; // 대쉬 중인지를 나타내기 위한 변수
+    bool isSwap; // 교체시간동안은 아무것도 못하도록 하는 코드를 위한 변수
 
     Vector3 moveVec;
     Vector3 dodgeVec;
@@ -26,6 +44,8 @@ public class Player : MonoBehaviour
     Animator anim;
 
     GameObject nearObject; // 트리거된 아이템을 저장하기 위한 변수
+    GameObject equipWeapon; // 장착중인 무기를 구분하기 위한 변수
+    int equipWeaponIndex = -1; // 장착중인 무기로 다시 스왑을 하려고 하는 경우를 구분하기 위한 변수, 초기값을 -1로 주어주기 않고 그냥 0으로 둘 경우 Swap에서 오류발생
 
     // Start is called before the first frame update
     void Awake()
@@ -47,6 +67,8 @@ public class Player : MonoBehaviour
         Turn();
         Jump();
         Dodge();
+        Swap();
+        Interation();
     }
 
     void GetInput()
@@ -55,7 +77,10 @@ public class Player : MonoBehaviour
         vAxis = Input.GetAxisRaw("Vertical"); // Vertical = up/ down
         wDown = Input.GetButton("Walk"); // 방향값이 아니라 shift버튼만 누르는 것이므로 GetButton으로 받아야함 
         jDown = Input.GetButtonDown("Jump"); // 버튼을 누른 그 순간만 읽는 것이므로 GetButtonDown을 쓴다
-        iDown = Input.GetButtonDown("Interation");
+        iDown = Input.GetButtonDown("Interation"); // 장비 장착을 구현하는 함수
+        sDown1 = Input.GetButtonDown("Swap1"); // 1 무기로 변경 
+        sDown2 = Input.GetButtonDown("Swap2"); // 2 무기로 변경 
+        sDown3 = Input.GetButtonDown("Swap3"); // 3 무기로 변경 
     }
 
     void Move()
@@ -69,6 +94,9 @@ public class Player : MonoBehaviour
         //     transform.position += moveVec * speed * Time.deltaTime; // fps의 영향을 받지 않도록 반드시 Time.deltaTime 추가!!
         if (isDodge)
             moveVec = dodgeVec; // 회피중에는 moveVec를 변경할 수 없도록 함
+
+        if(isSwap)
+            moveVec = Vector3.zero;
 
         transform.position += moveVec * speed * (wDown ? 0.5f : 1f) * Time.deltaTime; // 삼항연산자 = (bool ? true일때의 값 : false일때의값)
 
@@ -86,7 +114,7 @@ public class Player : MonoBehaviour
 
     void Jump()
     {
-        if (jDown && moveVec == Vector3.zero && !isJump && !isDodge)
+        if (jDown && moveVec == Vector3.zero && !isJump && !isDodge && !isSwap)
         { // jDown이 눌러졌고 움직이는 방향값이 0이며 isJump가 flase일때만 실행
             rigid.AddForce(Vector3.up * jumpPower, ForceMode.Impulse);
             anim.SetBool("isJump", true); // 애니메이션의 Bool함수 설정
@@ -97,7 +125,7 @@ public class Player : MonoBehaviour
 
     void Dodge()
     {
-        if (jDown && moveVec != Vector3.zero && !isJump && !isDodge)
+        if (jDown && moveVec != Vector3.zero && !isJump && !isDodge && !isSwap)
         {
             dodgeVec = moveVec;
             speed *= 2;
@@ -112,6 +140,54 @@ public class Player : MonoBehaviour
     {
         speed *= 0.5f;
         isDodge = false;
+    }
+
+    void Swap() 
+    {
+        if(sDown1 && (!hasWeapons[0] || equipWeaponIndex == 0)) // 괄호 주의, or 조건이 어디에 적용되는지를 잘 살펴봐야함
+            return;
+        if(sDown2 && (!hasWeapons[1] || equipWeaponIndex == 1)) // 괄호 주의, or 조건이 어디에 적용되는지를 잘 살펴봐야함
+            return;
+        if(sDown3 && (!hasWeapons[2] || equipWeaponIndex == 2)) // 괄호 주의, or 조건이 어디에 적용되는지를 잘 살펴봐야함
+            return;        
+
+        int weaponIndex = -1;
+        if (sDown1) weaponIndex = 0;
+        if (sDown2) weaponIndex = 1;
+        if (sDown3) weaponIndex = 2;
+
+        if((sDown1 || sDown2 || sDown3) && !isJump && !isDodge) {
+            if(equipWeapon != null) // equipWeapon이 -1일때 SetActive(false)를 실행하면 오류발생
+                equipWeapon.SetActive(false); // 장착중인 무기를 교환하기 위하여 새로운 변수 equipWeapon이라는 새로운 변수를 사용함
+
+            equipWeaponIndex = weaponIndex; // 장착중인 무기에 스왑을 요청하는 경우를 나타내기 위한 코드
+            equipWeapon = weapons[weaponIndex];
+            equipWeapon.SetActive(true); // Swap시 버튼마다 비활성화되어있는 무기들을 보이도록함
+
+            anim.SetTrigger("doSwap"); // doSwap 애니메이션 실행
+
+            isSwap = true; // isSwap = true인 동안에는 어떤 행동도 할 수 없음
+
+            Invoke("SwapOut", 0.4f); // 행동하기 위해서는 0.4초 후 SwapOut이 호출되어야 함
+        }
+    }
+
+    void SwapOut()
+    {
+        isSwap = false;
+    }
+
+    void Interation()
+    {
+        if(iDown && nearObject != null && !isJump && !isDodge) { 
+            if(nearObject.tag == "Weapon") {
+                Item item = nearObject.GetComponent<Item>(); // neatObject의 컴포넌트를 Item 변수에 넣음
+                int weaponIndex = item.value; // 무기의 value값을 저장하기 위한 변수
+                hasWeapons[weaponIndex] = true; // 무기마다 다른 value 값으로 어떤 무기를 입수헀는지를 구분함
+
+                Destroy(nearObject);
+            }
+        }
     }
 
     void OnCollisionEnter(Collision collision) // 매개변수를 통하여 충돌정보를 얻음
