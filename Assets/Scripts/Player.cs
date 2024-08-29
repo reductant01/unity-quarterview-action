@@ -8,13 +8,14 @@ public class Player : MonoBehaviour
 {
     public float speed; // 인스펙터 창에서 수정가능 
     public float jumpPower; // 점프높이 조정
-    public GameObject[] weapons; // 무기를 입수하면 해당무기의 모습을 나타내도록 하는 코드를 구현하기 위한 배열
-    public bool[] hasWeapons; // 가지고 있는 무기를 구분하기 위한 배열
+    public GameObject[] weapons; // 무기를 입수하면 해당무기의 모습을 나타내도록 하는 코드를 구현하기 위한 배열 변수
+    public bool[] hasWeapons; // 가지고 있는 무기를 구분하기 위한 배열 변수 
+    public GameObject[] grenades; // 공전하는 물체를 만들기 위한 배열 변수
+    public int hasGrenades;
 
     public int ammo;
     public int coin;
     public int health;
-    public int hasGrenades;
 
     public int maxAmmo;
     public int maxCoin;
@@ -220,14 +221,45 @@ public class Player : MonoBehaviour
         }
     }
 
-    void OnTriggerStay(Collider other) // Trigger했을때 = 맞닿다
+   void OnTriggerEnter(Collider other)
+    { // 
+        if(other.tag == "Item") {
+            Item item = other.GetComponent<Item>(); // other가 가지고 있는 Item 스크립트를 가지고 옴
+            switch (item.type) {
+                case Item.Type.Ammo:
+                    ammo += item.value;
+                    if (ammo > maxAmmo)
+                        ammo = maxAmmo; 
+                    break;
+                case Item.Type.Coin:
+                    coin += item.value;
+                    if (coin > maxCoin)
+                        coin = maxCoin;
+                    break;
+                case Item.Type.Heart:
+                    health += item.value;
+                    if (health > maxHealth)
+                        health = maxHealth;
+                    break;
+                case Item.Type.Grenade:
+                    grenades[hasGrenades].SetActive(true); // 먹은 수류탄의 갯수에 해당하는 객체를 보이도록 설정
+                    hasGrenades += item.value;
+                    if (hasGrenades > maxHasGrenades)
+                        hasGrenades = maxHasGrenades;
+                    break;
+            }
+            Destroy(other.gameObject);
+        }     
+    }
+    
+    void OnTriggerStay(Collider other) // Collision = 물리적 충돌 발생, Trigger = 단순 감지, On Stay = 맞닿아있을때
     {
         if(other.tag == "Weapon") // Collider.tag = Collider의 tag, Collider.GameObject.tag = Collider가 가진 GameObject의 tag
             nearObject = other.gameObject; 
         
     }
 
-    void OnTriggerExit(Collider other)
+    void OnTriggerExit(Collider other) // On Exit = 떨어졌을때
     {
         if(other.tag == "Weapon") 
             nearObject = null; 
