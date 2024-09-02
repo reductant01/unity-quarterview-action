@@ -12,6 +12,7 @@ public class Player : MonoBehaviour
     public bool[] hasWeapons; // 가지고 있는 무기를 구분하기 위한 배열 변수 
     public GameObject[] grenades; // 공전하는 물체를 만들기 위한 배열 변수
     public int hasGrenades;
+    public Camera followCamera; // 메인 카메라의 위치를 담을 변수
 
     public int ammo;
     public int coin;
@@ -25,11 +26,12 @@ public class Player : MonoBehaviour
     float hAxis;
     float vAxis;
     float originalSpeed; // 원래 속도를 저장할 변수
-    int wallCollisionCount = 0; // 벽과의 충돌 수를 추적
+    // int wallCollisionCount = 0; // 벽과의 충돌 수를 추적
 
     bool wDown; // 걸을 때를 표현하기 위한 변수
     bool jDown; // 점프하는 순간을 나타내기 위한 변수
     bool fDown; // 공격하는 순간을 나타내기 위한 변수
+    bool rDown; // 재장전
     bool iDown; // Weapon 장착을 위한 변수
     bool sDown1; // 장비 1
     bool sDown2; // 장비 2
@@ -38,7 +40,9 @@ public class Player : MonoBehaviour
     bool isJump; // 점프하는 중인지를 나타내기 위한 변수
     bool isDodge; // 대쉬 중인지를 나타내기 위한 변수
     bool isSwap; // 교체시간동안은 아무것도 못하도록 하는 코드를 위한 변수
+    bool isReload; // 무기 재장전이 되었는 지를 나타내기 위한 변수
     bool isFireReady = true; // 공격할 준비가 되었다는 걸 나타내는 변수
+    bool isBorder; // 플레이어 앞의 벽을 감지하기 위한 변수
 
     Vector3 moveVec;
     Vector3 dodgeVec;
@@ -71,6 +75,7 @@ public class Player : MonoBehaviour
         Turn();
         Jump();
         Attack();
+        Reload();
         Dodge();
         Swap();
         Interation();
@@ -82,7 +87,8 @@ public class Player : MonoBehaviour
         vAxis = Input.GetAxisRaw("Vertical"); // Vertical = up/ down
         wDown = Input.GetButton("Walk"); // 방향값이 아니라 shift버튼만 누르는 것이므로 GetButton으로 받아야함 
         jDown = Input.GetButtonDown("Jump"); // 버튼을 누른 그 순간만 읽는 것이므로 GetButtonDown을 쓴다
-        fDown = Input.GetButtonDown("Fire1"); // 마우스 왼쪽을 누르면 공격
+        fDown = Input.GetButton("Fire1"); // 마우스 왼쪽을 누르면 공격, GetButtonDown과 달리 누르고있어도 적용
+        rDown = Input.GetButtonDown("Reload"); // 재장전
         iDown = Input.GetButtonDown("Interation"); // 장비 장착을 구현하는 함수
         sDown1 = Input.GetButtonDown("Swap1"); // 1 무기로 변경 
         sDown2 = Input.GetButtonDown("Swap2"); // 2 무기로 변경 
@@ -101,10 +107,11 @@ public class Player : MonoBehaviour
         if (isDodge)
             moveVec = dodgeVec; // 회피중에는 moveVec를 변경할 수 없도록 함
 
-        if(isSwap || !isFireReady) // isFireReady사 false일 경우 움직일 수 없기에 초기값을 true로 주어준다
+        if(isSwap || isReload || !isFireReady) // isFireReady사 false일 경우 움직일 수 없기에 초기값을 true로 주어준다
             moveVec = Vector3.zero;
 
-        transform.position += moveVec * speed * (wDown ? 0.5f : 1f) * Time.deltaTime; // 삼항연산자 = (bool ? true일때의 값 : false일때의값)
+        if (!isBorder) // 이렇게 하지않고 위의 코드의 조건에 isBorder를 추가하게 되면 Vector3.zero이 되어 충돌시 회전도 못하게 되는 문제가 발생한다
+            transform.position += moveVec * speed * (wDown ? 0.5f : 1f) * Time.deltaTime; // 삼항연산자 = (bool ? true일때의 값 : false일때의값)
 
         anim.SetBool("isRun", moveVec != Vector3.zero); // Animation을 만들때 bool 함수로 만들었음, moveVec값이 0인지 아닌지를 isRun이름의 bool함수로 저장
         anim.SetBool("isWalk", wDown); // wDown인지를 판단하여 isWalk 함수를 만들어라
@@ -112,17 +119,34 @@ public class Player : MonoBehaviour
 
     void Turn()
     {
+        // #1. 키보드에 의한 회전
         transform.LookAt(transform.position + moveVec); // 회전을 구현하기 위한 코드이다
-        // 예를 들어 moveVec가 (1, 0, 0)일때 transform.LookAt(moveVec)만 입력한다면 아무리 움직여도 거의 중앙지점만 보게 된다. 
-        // transform.LookAt(transform.position)를 입력하면 플레이어의 위치를 바라보게 되어 회전하지 않는다 
-        // 따라서 transform.LookAt(transform.position + moveVec)를 입력하여 플레이어의 위치에서 (1, 0, 0)만큼 떨어진 지점을 보게 되어 가려는 방향을 바라보게 하는 것처럼 구현한다
+                                                        // 예를 들어 moveVec가 (1, 0, 0)일때 transform.LookAt(moveVec)만 입력한다면 아무리 움직여도 거의 중앙지점만 보게 된다. 
+                                                        // transform.LookAt(transform.position)를 입력하면 플레이어의 위치를 바라보게 되어 회전하지 않는다 
+                                                        // 따라서 transform.LookAt(transform.position + moveVec)를 입력하여 플레이어의 위치에서 (1, 0, 0)만큼 떨어진 지점을 보게 되어 가려는 방향을 바라보게 하는 것처럼 구현한다
+    
+        // #2. 마우스에 의한 회전
+        if (fDown) {
+            Ray ray = followCamera.ScreenPointToRay(Input.mousePosition); // ScreenPointToRay() : 스크린에서 월드로 Ray를 쏘는 함수
+            RaycastHit rayHit; // RaycastHit 정보를 저장할 변수 추가
+            if (Physics.Raycast(ray, out rayHit, 100)) { // ray = Ray 구조체로 시작점과 방향을 포함한다 
+                                                        // out = return처럼 반환값을 주어진 변수에 저장하는 키워드
+                                                        // rayHit = out 키워드를 사용하며 전달되며 광선이 충돌한 객체에 대한 정보를 담고있다
+                                                        // 100 = 광선이 탐색할 최대 거리이다 
+                                                        // Raycast = bool 값을 반환한다
+                                                        // 광선이 바닥이나 다른물체들과 충돌했을때를 말한다                                        
+                Vector3 nextVec = rayHit.point - transform.position; // 광선이 충돌한 지점의 좌표에서 현재 좌표를 빼어 방향벡터를 만들어낸다 
+                nextVec.y = 0; // 광선이 바닥이 아닌 다른 물체와 충돌할 경우 플레이어가 위쪽을 바라보게 되므로 nextVec.y를 0으로 고정하여 플레이어가 바닥과 평행한 곳만을 바라보도록 한다
+                transform.LookAt(transform.position + nextVec); // 현재 위치에서 nextVec 방향으로 약간 떨어진 지점을 의미한다                                   
+            }
+        }
     }
 
     void Jump()
     {
         if (jDown && moveVec == Vector3.zero && !isJump && !isDodge && !isSwap)
         { // jDown이 눌러졌고 움직이는 방향값이 0이며 isJump가 flase일때만 실행
-            rigid.AddForce(Vector3.up * jumpPower, ForceMode.Impulse);
+            rigid.AddForce(Vector3.up * jumpPower, ForceMode.Impulse); // AddForce(힘의 벡터값, 힘의 모드(Impulse는 즉발적인 힘을 가한다))
             anim.SetBool("isJump", true); // 애니메이션의 Bool함수 설정
             anim.SetTrigger("doJump");
             isJump = true;
@@ -139,11 +163,39 @@ public class Player : MonoBehaviour
 
         if(fDown && isFireReady && !isDodge && !isSwap) {
             equipWeapon.Use(); // Weapon 스크립트의 Use 함수 실행
-            anim.SetTrigger("doSwing");
+            anim.SetTrigger(equipWeapon.type == Weapon.Type.Melee ? "doSwing" : "doShot");
+            // equipWeapon의 type이 Melee이면 "doSwing", 아니면 "doShot"을 실행
             fireDelay = 0; // 공격딜레이를 0으로 돌려서 다음 공격까지 기다리도록 함
         } 
     }
 
+    void Reload()
+    {
+        if (equipWeapon == null) 
+            return;
+
+        if (equipWeapon.type == Weapon.Type.Melee)
+            return;
+
+        if (ammo == 0)
+            return;
+
+        if (rDown && !isJump && !isDodge && !isSwap && isFireReady) { // 공격할 준비가 되어있을때만 장전이 가능하도록 함
+            anim.SetTrigger("doReload");
+            isReload = true; 
+
+            Invoke("ReloadOout", 2f); // 0.5초 후 재장전이 되도록 설정
+        }        
+    }
+
+    void ReloadOout()
+    {
+        int reAmmo = ammo < equipWeapon.maxAmmo ? ammo : equipWeapon.maxAmmo; 
+        // ammo가 maxAmmo보다 작을때는 ammo가 curAmmo가 되어야하고 클때는 curAmmo가 maxAmmo되어야 한다
+        equipWeapon.curAmmo = reAmmo; 
+        ammo -= reAmmo; // Player가 가지고있는 탄의 수에 재장전된 탄의 수를 빼주어야 한다
+        isReload = false; // 재장전이 되고 isReload를 통해 재장전 중이 아니라는 것을 나타냄
+    }
     void Dodge()
     {
         if (jDown && moveVec != Vector3.zero && !isJump && !isDodge && !isSwap)
@@ -212,6 +264,26 @@ public class Player : MonoBehaviour
         }
     }
 
+    void FreezeRotation() // 물체와 충돌했을때 플레이어가 회전하게 되는 문제를 해결하기 위한 함수
+    {
+        rigid.angularVelocity = Vector3.zero; // angularVelocity = 물리회전속도
+    }
+
+    void StopToWall()
+    {
+        Debug.DrawRay(transform.position, transform.forward * 5, Color.green); // DrawRay = Scene내에서 Ray를 보여주는 함수
+                                                                                // DrawRay(시작위치, 쏘는방향 * 길이, 색깔)
+                                                                                // Ray를 통해 플레이어 앞의 물체를 빠르게 감지할 수 있다
+        isBorder = Physics.Raycast(transform.position, transform.forward, 5, LayerMask.GetMask("Wall")); // Ray를 쏘아 닿는 오브젝트를 감지하는 함수 
+                                                                                                        // (시작위치, 방향, 길이, 충돌한 물체의 LayerMask가 'Wall'인가)                                                                     
+    }
+    
+    void FixedUpdate() 
+    {
+        FreezeRotation(); // update될때마다 회전속도를 0으로 만들어준다
+        StopToWall();
+    }
+
     void OnCollisionEnter(Collision collision) // 매개변수를 통하여 충돌정보를 얻음
     {
         if (collision.gameObject.tag == "Floor")
@@ -220,26 +292,26 @@ public class Player : MonoBehaviour
             isJump = false;
         }
 
-        if (collision.gameObject.tag == "Wall")
-        {
-            wallCollisionCount++; // 벽과 충돌할 때마다 카운터 증가
-            if (wallCollisionCount == 1) // 첫 충돌시에만 속도를 0으로 설정
-            {
-                speed = 0;
-            }
-        }
+        // if (collision.gameObject.tag == "Wall")
+        // {
+        //     wallCollisionCount++; // 벽과 충돌할 때마다 카운터 증가, 2개의 벽에 부딪혔다가 하나의 벽에서 떨어졌을 경우 벽을 통과하는 문제를 해결하기 위한 코드
+        //     if (wallCollisionCount == 1) // 첫 충돌시에만 속도를 0으로 설정
+        //     {
+        //         speed = 0;
+        //     }
+        // }
     }
 
     void OnCollisionExit(Collision collision)
     {
-        if (collision.gameObject.tag == "Wall")
-        {
-            wallCollisionCount--; // 벽과의 충돌이 끝날 때마다 카운터 감소
-            if (wallCollisionCount == 0) // 마지막 벽과의 충돌이 끝났을 때만 속도 복구
-            {
-                speed = originalSpeed;
-            }
-        }
+        // if (collision.gameObject.tag == "Wall")
+        // {
+        //     wallCollisionCount--; // 벽과의 충돌이 끝날 때마다 카운터 감소
+        //     if (wallCollisionCount == 0) // 마지막 벽과의 충돌이 끝났을 때만 속도 복구
+        //     {
+        //         speed = originalSpeed;
+        //     }
+        // }
     }
 
    void OnTriggerEnter(Collider other)

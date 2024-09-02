@@ -80,12 +80,12 @@ SphereCollider:
     serializedVersion: 2
     m_Bits: 0
   m_LayerOverridePriority: 0
-  m_IsTrigger: 1
+  m_IsTrigger: 0
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
   m_Radius: 0.5
-  m_Center: {x: 0, y: 2, z: 0}
+  m_Center: {x: 0, y: 0.5, z: 0}
 --- !u!135 &8422251543124529367
 SphereCollider:
   m_ObjectHideFlags: 0
@@ -106,7 +106,7 @@ SphereCollider:
   m_Enabled: 1
   serializedVersion: 3
   m_Radius: 5
-  m_Center: {x: 0, y: 2, z: 0}
+  m_Center: {x: 0, y: 1, z: 0}
 --- !u!114 &1449395979086883863
 MonoBehaviour:
   m_ObjectHideFlags: 0

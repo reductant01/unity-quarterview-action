@@ -13,7 +13,7 @@ GameObject:
   - component: {fileID: 8532118383608204360}
   - component: {fileID: 769194932324733168}
   - component: {fileID: 541418342237418473}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Bullet SubMushineGun
   m_TagString: Untagged
   m_Icon: {fileID: 0}
